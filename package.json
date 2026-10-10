@@ -1,0 +1,42 @@
+{
+  "name": "@yourscope/dsh-motor-ai-core",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./index.mjs",
+  "description": "电机 AI 设计核心库 —— 公式引擎 / 代理模型 / 经验回灌 / 遥测（L0/L1/L2 共享），零 DSH Runtime 依赖，可离线加载",
+  "files": [
+    "index.mjs",
+    "lib/"
+  ],
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "keywords": [
+    "motor-design",
+    "electric-motor",
+    "l0-estimate",
+    "surrogate-model",
+    "formula-engine",
+    "design-validation"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "wangxuewangxue98",
+    "url": "https://github.com/wangxuewangxue98"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wangxuewangxue98/dsh-motor-ai-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wangxuewangxue98/dsh-motor-ai-core/issues"
+  },
+  "homepage": "https://github.com/wangxuewangxue98/dsh-motor-ai-core#readme",
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.2 <0.2.0"
+  }
+}
