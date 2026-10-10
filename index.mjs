@@ -196,6 +196,7 @@ export {
   scanForbidden,
   getExperienceSink,
   logExperience,
+  reportExperience,
   EXPERIENCE_TTL_MS,
   gcExperience,
 } from './lib/experience-upload.mjs'
@@ -208,6 +209,7 @@ export {
   readPendingRecords,
   aggregateUsage,
   attachSessionTelemetry,
+  reportTelemetry,
 } from './lib/telemetry.mjs'
 
 // Usage Log
