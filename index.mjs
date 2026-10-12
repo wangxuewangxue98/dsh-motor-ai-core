@@ -93,6 +93,7 @@ export {
   round5,
   fitLambdaWithinRange,
   TYPICAL_B_DELTA, TYPICAL_SIGMA, queryTypicalBLoading,
+  TORQUE_OVERLOAD_FACTOR, TORQUE_OVERLOAD_FACTOR_DEFAULT, queryTorqueOverloadFactor,
 } from './lib/motor-constants.mjs'
 
 // Param Schema
@@ -140,6 +141,7 @@ export {
   quickL0Estimate,
   computeTorqueD2L,
   computeTorqueStress,
+  deriveTorqueEnvelope,
 } from './lib/formula-engine.mjs'
 
 // Torque Resolver (P4 三级降级编排器)

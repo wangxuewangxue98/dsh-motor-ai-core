@@ -5,7 +5,7 @@
 **零 DSH Runtime 依赖**：纯 ESM、零第三方运行时依赖，可离线加载、可独立单测。
 
 - 包名：`@wangxue98/dsh-motor-ai-core`
-- 当前版本：`1.1.1`
+- 当前版本：`1.2.0`
 - 许可：MIT
 - 上游消费方：[`dsh-motor-ai-l0`](https://www.npmjs.com/package/dsh-motor-ai-l0)（免费 L0 广筛）、`dsh-motor-ai`（完整版）
 
@@ -52,8 +52,9 @@ L0 广筛中「转矩」是两个**不同物理量**，本库以**双字段**严
 
 | 字段 | 含义 | 来源 | 置信度 |
 |---|---|---|---|
-| `torque` | **期望输出** —— 规格要求的额定转矩 | `9550·P(kW)/n(rpm)`（精确恒等式） | 1.0 |
-| `torque_capability` | **可达能力** —— 该几何实际能输出的转矩估计 | 三级降级：代理(T1) → D²L 电磁负荷(T2) → 切向应力(T2b) | 0.5 / 按源 |
+| `torque` | **需求扭矩** —— 规格要求的额定转矩 | `9550·P(kW)/n(rpm)`（精确恒等式） | 1.0 |
+| `torque_capability` | **额定提供** —— 该几何长期可输出的转矩估计 | 三级降级：代理(T1) → D²L 电磁负荷(T2) → 切向应力(T2b) | 0.5 / 按源 |
+| `torque_capability_max` | **最大提供** —— 短时可输出的转矩 | `torque_capability × overload_factor` | 0.5 / 按源 |
 
 三级降级编排器 `l0TorqueEstimate(params, opts)`：
 
@@ -62,19 +63,38 @@ L0 广筛中「转矩」是两个**不同物理量**，本库以**双字段**严
   ├─ 有 P 与 n  → 9550·P/n（精确，conf 1.0）
   └─ 无 P 或 n  → 回退「可达能力」值（conf 降低，显式标注）
 
-可达能力 torque_capability
+可达能力 torque_capability（额定提供）
   ├─ T1  代理模型（需 opts.surrogateTorque>0 且 conf≥0.70 且 env DSH_L0_SURROGATE_TORQUE=1）
   ├─ T2  D²L 电磁负荷法  T = (π/2)·Bδ·A·D²·L·kw·kFe·kSat
   ├─ T2b 切向应力法      T = (π/2)·D²·L·σ
   └─ unavailable → 0（**恒 0，不伪造**）
 ```
 
+### 需求 vs 提供：三档可行性判据（1.2.0）
+
+`deriveTorqueEnvelope(demandNm, capabilityRatedNm, motorType, overloadFactor?)` 把三者合成一个几何可行性信号：
+
+| `torque_feasibility` | 条件 | 工程含义 |
+|---|---|---|
+| `ample` | 需求 ≤ 额定提供 | 充裕，几何还有缩小空间 |
+| `overload_only` | 额定提供 < 需求 ≤ 最大提供 | 仅短时过载可行，长期不行 |
+| `undersized` | 需求 > 最大提供 | 几何偏小，必须放大机座 |
+| `unknown` | 需求或提供缺数据 | 不作判定（**不伪造**） |
+
+边界含等号：需求 = 额定 ⇒ `ample`；需求 = 最大 ⇒ `overload_only`。
+配套字段：`torque_margin`（最大/需求）、`torque_margin_rated`（额定/需求）。
+
+**过载倍数 `TORQUE_OVERLOAD_FACTOR`**：`induction = 2.0`（GB/T 一般用途异步机最大转矩倍数下限）、`pmsm = 1.8`
+（PMSM 短时过载受逆变器限流 + 永磁体不可逆去磁双重约束，取略低于异步机的保守值）。
+⚠ **非本项目真值标定** —— `case_motors.max_torque / max_torque_ratio` 全表仅 1 行且 NULL。
+
 **口径纪律（重要）**
 
 - `D` 一律取**定子内径（气隙直径）**，不是定子外径。典型切向应力 σ ≈ 28 kPa 量级即为该口径；误用外径会低估约 2~3×。
 - T1 代理转矩默认**关闭**（`DSH_L0_SURROGATE_TORQUE` 未设为 `1` 时不启用）——真值样本不足时宁可降级到公式，不用低质量代理。
 - 交接给 L1（RMxprt）时必须用 **规格** `torque_nm`，不得用 `torque_capability` 当规格。
-- 旧版「`estimated_torque = torque_nm × D²L/D²L_base` 线性类比」**已弃用**（实测最大偏离 523%）。
+- 旧版「`estimated_torque = torque_nm × D²L/D²L_base` 线性类比」**已删除**（实测最大偏离 523%，字段不再产出）。
+- 无 P/n（需求未知）时，`torque` 虽回退为能力值，但判据传 demand=0 ⇒ `unknown`，**不得自比自判 `ample`**。
 
 ---
 

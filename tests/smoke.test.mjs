@@ -6,6 +6,9 @@ import {
   computeTorqueD2L,
   computeTorqueStress,
   queryTypicalBLoading,
+  queryTorqueOverloadFactor,
+  TORQUE_OVERLOAD_FACTOR,
+  deriveTorqueEnvelope,
   l0TorqueEstimate,
   isSurrogateTorqueEnabled,
   validateDesign,
@@ -86,4 +89,41 @@ test('V16: 工频同步点断崖严格拦截，VFD 同工况降级为提示', ()
   const vfd = validateDesign({ ...base, line_freq_hz: 50 })
   assert.equal(v16(vfd)?.level, 'warning', 'VFD 模式下同一工况应为临界可行提示')
   assert.match(v16(vfd)?.msg ?? '', /Hz/, '提示须给出频率微调建议')
+})
+
+test('v1.2.0 转矩包络：过载倍数表取值（异步 2.0 / PMSM 1.8，非标定）', () => {
+  assert.equal(TORQUE_OVERLOAD_FACTOR.induction, 2.0, '异步机过载倍数取 GB/T 下限 2.0')
+  assert.equal(TORQUE_OVERLOAD_FACTOR.pmsm, 1.8, 'PMSM 受逆变器限流+去磁约束取 1.8')
+  assert.equal(queryTorqueOverloadFactor('induction'), 2.0)
+  assert.equal(queryTorqueOverloadFactor('pmsm'), 1.8)
+  assert.equal(queryTorqueOverloadFactor('unknown_type'), 2.0, '非法机型安全回退缺省')
+})
+
+test('v1.2.0 转矩包络：三档判据边界 + 缺数据不得伪造', () => {
+  // rated=100, K=2.0 ⇒ max=200
+  assert.equal(deriveTorqueEnvelope(80, 100, 'induction').torque_feasibility, 'ample')
+  assert.equal(deriveTorqueEnvelope(100, 100, 'induction').torque_feasibility, 'ample', '需求=额定 ⇒ ample')
+  assert.equal(deriveTorqueEnvelope(150, 100, 'induction').torque_feasibility, 'overload_only')
+  assert.equal(deriveTorqueEnvelope(200, 100, 'induction').torque_feasibility, 'overload_only', '需求=最大 ⇒ overload_only')
+  assert.equal(deriveTorqueEnvelope(250, 100, 'induction').torque_feasibility, 'undersized')
+  // 缺数据不得伪造判据
+  assert.equal(deriveTorqueEnvelope(0, 100, 'induction').torque_feasibility, 'unknown')
+  assert.equal(deriveTorqueEnvelope(100, 0, 'induction').torque_feasibility, 'unknown')
+  assert.equal(deriveTorqueEnvelope(100, 0, 'induction').torque_capability_max, 0)
+  // PMSM 走自身倍率：190 > 100×1.8=180 ⇒ undersized
+  const pm = deriveTorqueEnvelope(190, 100, 'pmsm')
+  assert.equal(pm.torque_capability_max, 180)
+  assert.equal(pm.torque_feasibility, 'undersized')
+})
+
+test('v1.2.0 编排器透传包络字段，且无 P/n 时不自比自判', () => {
+  const r = l0TorqueEstimate({ power_kw: 15, speed: 1460, stator_id: 160, core_length: 130, motor_type: 'induction' })
+  assert.equal(r.torque, 98.12, '期望输出=规格 9550·P/n')
+  assert.ok(r.torque_capability_max > r.torque_capability, '最大提供必须大于额定提供')
+  assert.equal(r.overload_factor, 2.0)
+  assert.ok(['ample', 'overload_only', 'undersized'].includes(r.torque_feasibility))
+
+  // 无 P/n：torque 回退为能力值，此时不得自比自判 ample
+  const noPn = l0TorqueEstimate({ stator_id: 160, core_length: 130, motor_type: 'induction' })
+  assert.equal(noPn.torque_feasibility, 'unknown', '需求未知必须 unknown')
 })

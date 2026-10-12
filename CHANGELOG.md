@@ -2,6 +2,32 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.2.0] - 2026-10-13 — 🎯 转矩三档包络：需求 / 额定提供 / 最大提供 + 可行性判据
+
+> **性质：新增能力字段 + 判据 + 清残留。旧字段语义收窄（torque_capability 明确为「额定提供」）。**
+
+### Added
+- **过载倍数表** `TORQUE_OVERLOAD_FACTOR`（`motor-constants.mjs`）：
+  `induction = 2.0`（GB/T 一般用途异步机最大转矩倍数下限）、`pmsm = 1.8`
+  （PMSM 无固有最大转矩倍率，短时过载受逆变器限流 + 永磁体不可逆去磁双重约束，取略低于异步机的保守值）。
+  配套 `queryTorqueOverloadFactor(motorType)`（非法入参安全回退缺省 2.0）。
+  ⚠ **非真值标定**：`case_motors.max_torque / max_torque_ratio` 全表仅 1 行且 NULL；
+  `qg3d_residuals.torque_ratio` 非空 0 行。真值积累后可整体替换此表（单一旋钮）。
+- **包络派生** `deriveTorqueEnvelope(demandNm, capabilityRatedNm, motorType, overloadFactor)`（`formula-engine.mjs`），
+  产出 `torque_capability_max` / `overload_factor` / `torque_margin` / `torque_margin_rated` / `torque_feasibility`。
+- **三档可行性判据** `torque_feasibility`：
+  `ample`（需求 ≤ 额定提供）/ `overload_only`（额定 < 需求 ≤ 最大）/ `undersized`（需求 > 最大）/ `unknown`（缺数据，不伪造）。
+  边界含等号：需求=额定 ⇒ ample，需求=最大 ⇒ overload_only。
+- 编排器 `l0TorqueEstimate` 透传包络字段；无 P/n（需求未知）时传 demand=0 ⇒ `unknown`，**不自比自判 ample**。
+- 白名单 `L0_NATIVE_FIELDS` +5（`torque_capability_max/overload_factor/torque_margin/torque_margin_rated/torque_feasibility`）；
+  `PHYSICS_FIELDS` 以包络字段替换已删除的 `estimated_torque`。
+- 冒烟测试 +3 项（过载倍数表 / 三档边界含等号与缺数据 / 编排器透传与不自比自判），共 11 项。
+
+### Changed
+- `torque_capability` 语义**收窄并钉死**为「额定提供」（典型电磁负荷下长期可输出），
+  不再是含糊的「可达能力」；「最大提供」由新增的 `torque_capability_max` 承担。
+- `capability_confidence`：能力不可得时为 `0`（此前恒 0.5，会误导下游以为有估计）。
+
 ## [1.1.1] - 2026-10-12 — 🔧 补导出 `SLIP_MIN_TOL` + 仓库文档补齐
 
 > **性质：补导出 + 文档。无行为变更。**
