@@ -91,6 +91,7 @@ export {
   round4,
   round5,
   fitLambdaWithinRange,
+  TYPICAL_B_DELTA, TYPICAL_SIGMA, queryTypicalBLoading,
 } from './lib/motor-constants.mjs'
 
 // Param Schema
@@ -136,7 +137,15 @@ export {
   l1EfficiencyProxy,
   l1MaxTempProxy,
   quickL0Estimate,
+  computeTorqueD2L,
+  computeTorqueStress,
 } from './lib/formula-engine.mjs'
+
+// Torque Resolver (P4 三级降级编排器)
+export {
+  l0TorqueEstimate,
+  isSurrogateTorqueEnabled,
+} from './lib/torque-resolver.mjs'
 
 // Design Rules
 export {
