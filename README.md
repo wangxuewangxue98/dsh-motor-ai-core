@@ -5,7 +5,7 @@
 **零 DSH Runtime 依赖**：纯 ESM、零第三方运行时依赖，可离线加载、可独立单测。
 
 - 包名：`@wangxue98/dsh-motor-ai-core`
-- 当前版本：`1.2.0`
+- 当前版本：`1.3.0`
 - 许可：MIT
 - 上游消费方：[`dsh-motor-ai-l0`](https://www.npmjs.com/package/dsh-motor-ai-l0)（免费 L0 广筛）、`dsh-motor-ai`（完整版）
 

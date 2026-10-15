@@ -2,6 +2,42 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.3.0] - 2026-10-15 — 🔧 杠杆验证支持：规则裕度 / 杠杆反解 / 匝数自洽反解 / 温升代理标注
+
+> **性质：纯新增能力 + 输出增强。规则判据（status/issues）语义零变化；issue 对象新增可选
+> `margin`/`proxy` 键，metrics 新增 `leverage_headroom`/`thermal.is_proxy`/`back_emf.integer_options`。**
+
+### Added
+- **规则裕度** `ruleMargin(value, limit, {unit, better})` / `rangeMargin(value, lo, hi, {unit})`
+  （`design-rules.mjs`）：把「离限值还有多远」显式量化——`margin_pct > 0` = 仍在限内。
+  V02/V03/V04/V07/V08/V09/V10/V11/V12/V14/V15/V16/V17 触发的 issue 均带 `margin`
+  （示例：`Bt=1.62T vs 限值 1.70T ⇒ margin_pct=+4.7`）。动机：微调杠杆此前只能盲试。
+- **杠杆反解块** `metrics.leverage_headroom`（v1.3.0 P0-2）：
+  - `V07`：`toothWidthForFlux()`——按目标齿磁密反解**最低齿宽**（`toothFluxDensity` 的严格逆函数）
+  - `V08`：`yokeThicknessForFlux({targetBy: B_YOKE_SAT_T})`——按硅钢饱和极限反解**最低轭厚**
+  - `V15`：`turns_max`——槽满率与匝数严格成正比（`conductorArea=2·turns·aWire`，aWire 与匝数无关）
+    ⇒ 精确逆解；`adjustable` 即「还能加几匝」
+- **匝数自洽反解** `solveTurnsPerCoil({voltage, speed, poles, statorId, coreLength, slotsStator, ...})`
+  （从 V14/V17 规则块抽出，判据逻辑不变）：输出理想匝数/整匝匝数/量化偏差/反电势偏差，
+  以及**可取整域** `integer_options`（反电势偏差在 `BACKEMF_TOL` 内的整数匝集合）。
+  与 `deriveElectricalClosure` 同源同口径，但不依赖功率/电流（缺 peak_current 也能反解）。
+  V14 块改为调用本函数（零行为变化），`metrics.back_emf` 增补 `integer_options`。
+
+### Changed
+- **V12 温升代理标注**（P1-6）：`metrics.thermal.is_proxy = true` + `proxy_note`
+  （「热负荷法代理值，仅作量级判断」），V12 issue 带 `proxy: true`。
+  依据：L0 温升模型未标定（历史实测与真值相关性极弱），须防把「杠杆降温 5K」当设计依据。
+- `metrics.thermal` 增补 `efficiency_raw`（sweep 指标曲线用）。
+- `index.mjs` 新增导出：`toothWidthForFlux` / `ruleMargin` / `rangeMargin` / `solveTurnsPerCoil`。
+
+### Fixed
+- `validateDesign` V14/V17 区块的 destructure 曾错配 snake/camel 键名（静默 NaN）——
+  已在 `tests/leverage-margin.test.mjs` 增加数值型断言 + V14 回归用例看守。
+
+### Tests
+- `tests/leverage-margin.test.mjs`（新，9 用例）：裕度语义、逆函数一致性、V08/V15 headroom
+  精确边界（turns_max 不越限 / +1 越限）、V14 抓填错、健康行不误伤。全套 20/20 通过。
+
 ## [1.2.0] - 2026-10-13 — 🎯 转矩三档包络：需求 / 额定提供 / 最大提供 + 可行性判据
 
 > **性质：新增能力字段 + 判据 + 清残留。旧字段语义收窄（torque_capability 明确为「额定提供」）。**

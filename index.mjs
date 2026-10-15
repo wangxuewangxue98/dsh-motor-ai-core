@@ -156,9 +156,13 @@ export {
   ESCALATABLE_RULES,
   poleFlux,
   toothFluxDensity,
+  toothWidthForFlux,
   yokeFluxDensity,
   airGapFluxActual,
   slotGeometry,
+  ruleMargin,
+  rangeMargin,
+  solveTurnsPerCoil,
   validateDesign,
   validateDesignBatch,
 } from './lib/design-rules.mjs'
