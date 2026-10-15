@@ -160,6 +160,8 @@ export {
   yokeFluxDensity,
   airGapFluxActual,
   slotGeometry,
+  SLOT_FAMILIES,
+  slotFamilyInfo,
   ruleMargin,
   rangeMargin,
   solveTurnsPerCoil,

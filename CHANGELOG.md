@@ -2,6 +2,27 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.3.1] - 2026-10-15 — P2：verdict 密度无关化 + 槽形族感知
+
+> **性质：输出增强 + 规则层族感知；status/issues 合格判定语义零变化。**
+
+### Added
+- **verdict 密度无关化**（`validateDesign` 返回 `verdict_basis`）：`status`（passed/warning/failed）
+  仅由 V01~V18 物理规则驱动，显式声明 `density_independent: true` 并列出 `drivers`
+  （触发 verdict 的 rule+level）；l0 侧 `density_check` 自检（DENSITY_NOT_CONVERGED）只以
+  warning 进入 `warnings`，永不改写 `summary.failed`。动机：杜绝「密度/负荷类指标」被误当作
+  合格判据（历史上曾被当作门禁，导致假绿灯）。
+- **槽形族感知**（`SLOT_FAMILIES` 常量 + `slotFamilyInfo(name)` 查询函数）：
+  梨形/梯形半开口/开口矩形/斜肩梨形/闭口槽五族，每族含 `tooth_width_ratio` 经验区间、
+  `typical_use`、`notes`。V09 块在识别到 `slot_family` 入参时回显
+  `metrics.slot.slot_family`（id）+ `slot_family_label`（中文名）；未知族静默回落不报错。
+- `index.mjs` 新增导出：`SLOT_FAMILIES` / `slotFamilyInfo`。
+
+### Tests
+- `tests/p2-leverage.test.mjs`（新，4 用例）：verdict_basis 存在 + density_independent=true；
+  failed 案例 drivers 精确追溯 V08；slot_family 回显（含未知族）；slotFamilyInfo 查表 + 结构。
+  全套 24/24 通过。
+
 ## [1.3.0] - 2026-10-15 — 🔧 杠杆验证支持：规则裕度 / 杠杆反解 / 匝数自洽反解 / 温升代理标注
 
 > **性质：纯新增能力 + 输出增强。规则判据（status/issues）语义零变化；issue 对象新增可选
