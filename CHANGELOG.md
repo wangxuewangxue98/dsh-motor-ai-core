@@ -2,7 +2,7 @@
 
 本项目的所有重大变更都记录在此文件中。
 
-## [Unreleased] — P0 四项：磁密口径统一 / V08 严重档 / 工程槽满率 / 电流 pf-η 分档
+## [1.4.0] - 2026-10-17 — P0 四项：磁密口径统一 / V08 严重档 / 工程槽满率 / 电流 pf-η 分档
 
 > **性质：判定口径修正（会改变可行性与效率/温升数值）。** 依据《L0 插件程序深度分析与改进方案 v2》
 > （2026-10-17）P0 四项。三项行为变更各带 env 回退开关（默认新口径），便于单变量对照。
@@ -39,12 +39,20 @@
 
 ### Fixed
 - V15 匝数 headroom 边界因 `round3` 取整差 1 匝，与判据自相矛盾（turns_max 不越限但 +1 也不越限）。
+- **P0-3 开关的 opts 通道被静默丢弃**：`estimateCopperLoss` 内部以 `engSlotFillOn()` 无参调用，
+  `design-rules.mjs:854` 的 `useEng` 同样无参 ⇒ 调用方传入的 `opts.engSlotFill` 完全不生效
+  （env 通道正常，故只测 env 的门禁未抓到）。修复：`estimateCopperLoss` 新增解构字段 `opts`，
+  三处调用改 `engSlotFillOn(opts)`；`quickL0Estimate` 与 `validateDesign` 均透传 opts。
+  发现途径：tarball 功能自检（首次打包后从解包目录实跑 P0 四项断言）。
 
 ### Tests
 - `tests/leverage-margin.test.mjs`：V15 headroom 断言改为按判定口径取值；新增
   「P0-3 反向守卫」（旧口径漏判的过槽满必须被工程口径抓到）；healthy 行 fixture 的
   peak_current 40→32（原 40A 配 11 匝工程口径实为 0.804，本就过槽满，旧口径漏判）。
-  全套 25/25 通过。
+- 新增「P0-3 开关双通道」用例：**env 与 opts 两条通道分别断言**（不只测 env），
+  覆盖 `estimateCopperLoss` / `validateDesign`（metrics.slot_fill.caliber + ratio + headroom 备注）
+  / `quickL0Estimate`（native.slot_fill_caliber）三条路径；并做反向破坏验证
+  （改回 `engSlotFillOn()` 无参 ⇒ 该用例变红）。全套 26/26 通过。
 
 ## [1.3.1] - 2026-10-15 — P2：verdict 密度无关化 + 槽形族感知
 
