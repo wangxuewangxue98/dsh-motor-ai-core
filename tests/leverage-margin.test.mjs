@@ -13,6 +13,7 @@ import {
   yokeThicknessForFlux,
   validateDesign,
   estimateCopperLoss,
+  quickL0Estimate,
   BACKEMF_TOL,
   SLOT_FILL_MAX,
   B_YOKE_SAT_T,
@@ -138,6 +139,53 @@ test('P0-3 反向守卫：旧「裸铜净/毛槽」口径漏判的过槽满，�
     `旧口径下该行槽满率应偏低（漏判区），实际 ${cu.slot_fill_ratio}`)
   assert.ok(cu.slot_fill_engineering > SLOT_FILL_MAX,
     `工程口径下该行应越限（真实过槽满），实际 ${cu.slot_fill_engineering}`)
+})
+
+test('P0-3 开关双通道：env 与 opts 必须都生效（防 opts 被无参调用静默丢弃）', () => {
+  // 教训：estimateCopperLoss / validateDesign 内部曾用 engSlotFillOn() 无参调用，
+  // env 通道正常但 opts 通道被静默丢弃，而门禁只测了 env ⇒ 缺陷漏网。
+  // 本用例对**两条通道**分别断言，且断言的是「判定用的口径」而非仅新字段是否存在。
+  const base = {
+    statorOd: 260, statorId: 170, coreLength: 195, slotsStator: 36, poles: 4,
+    peakCurrent: 42.8, turnsPerCoil: 7, parallelCircuits: 1, airGap: 0.51,
+  }
+  const calOf = (o) => estimateCopperLoss({ ...base, opts: o }).slot_fill_caliber
+  assert.equal(calOf({ engSlotFill: true }), 'engineering', 'opts=true 必须走工程口径')
+  assert.equal(calOf({ engSlotFill: false }), 'net_over_gross', 'opts=false 必须回退旧口径')
+  assert.equal(calOf(null), 'engineering', '未传 opts 时按 env 默认 ON')
+
+  const row = {
+    stator_od: 260, stator_id: 170, rotor_od: 169, shaft_dia: 48,
+    core_length: 195, air_gap: 0.51, tooth_width: 7.25, yoke_thickness: 18,
+    poles: 4, speed: 1460, slots_stator: 36, slots_rotor: 28,
+    parallel_circuits: 1, turns_per_coil: 7, peak_current: 42.8, voltage: 380,
+    power_kw: 15, cooling: 'forced_air', motor_type: 'induction',
+  }
+  const off = validateDesign(row, { engSlotFill: false })
+  assert.equal(off.metrics.slot_fill.caliber, 'net_over_gross', '门禁侧 opts=false 口径必须回退')
+  assert.equal(off.metrics.slot_fill.ratio, off.metrics.slot_fill.ratio_net,
+    '旧口径下判定值必须等于旧口径比值')
+  const on = validateDesign(row, { engSlotFill: true })
+  assert.equal(on.metrics.slot_fill.caliber, 'engineering', '门禁侧 opts=true 口径必须为工程')
+  assert.ok(on.metrics.slot_fill.ratio > on.metrics.slot_fill.ratio_net,
+    '工程口径判定值必须显著大于旧口径（否则等于没切）')
+  // 逆解必须与判据同口径：关闭工程口径时 headroom 也会随之回退
+  assert.ok(off.metrics.leverage_headroom.V15.note.includes('旧净/毛口径'),
+    '关闭工程口径后 V15 headroom 备注应声明旧口径')
+
+  // 主指标侧（quickL0Estimate）同样必须透传 opts：
+  // 605 行把 opts 传给 estimateCopperLoss，否则 native.slot_fill_caliber 恒为 engineering。
+  const spec = {
+    power_kw: 15, voltage_v: 380, frequency_hz: 50, poles: 4, speed_rpm: 1460,
+    stator_od: 260, stator_id: 160, stack_length: 130, air_gap: 0.4,
+    slots_stator: 36, rotor_slots: 28, tooth_width: 7.1, yoke_thickness: 32,
+    motor_type: 'asynchronous', cooling: 'forced_air', insulation_class: 'B',
+    turns_per_coil: 11, peak_current: 40,
+  }
+  assert.equal(quickL0Estimate(spec, { engSlotFill: true }).slot_fill_caliber, 'engineering')
+  assert.equal(quickL0Estimate(spec, { engSlotFill: false }).slot_fill_caliber, 'net_over_gross',
+    'quickL0Estimate 未透传 opts ⇒ 主指标口径与门禁口径可能再次分裂')
+  assert.equal(quickL0Estimate(spec).slot_fill_caliber, 'engineering', '未传 opts 时按 env 默认 ON')
 })
 
 test('validateDesign: V12 温升打代理标记 + back_emf 带可取整域', () => {
