@@ -2,6 +2,50 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [Unreleased] — P0 四项：磁密口径统一 / V08 严重档 / 工程槽满率 / 电流 pf-η 分档
+
+> **性质：判定口径修正（会改变可行性与效率/温升数值）。** 依据《L0 插件程序深度分析与改进方案 v2》
+> （2026-10-17）P0 四项。三项行为变更各带 env 回退开关（默认新口径），便于单变量对照。
+
+### Added
+- **P0-1 实际匝口径磁密**：`quickL0Estimate` 原生输出新增 `air_gap_flux_density_actual` /
+  `tooth_flux_density_actual` / `yoke_flux_density_actual` / `bg_caliber`。
+  `Bg_actual = Bg_intent·(N_ideal/N_int)`，与 `design-rules.mjs:266 airGapFluxActual` 同式
+  （按匝比直接算，避免 formula-engine → design-rules 循环依赖）。
+- **P0-2 V08 严重档**：新增常量 `B_YOKE_SEVERE_T = 1.7`；`By∈(1.7,1.9]` 判 warning 且打
+  `severity:'severe'`，`metrics.flux.yoke_severe` 同步回显；>1.9T 仍 failed（判据未放宽）。
+- **P0-3 工程槽满率**：新增 `slotAreaNet()` 与常量 `SLOT_LINER_T_MM=0.30` /
+  `SLOT_WEDGE_T_MM=2.5` / `SLOT_SHAPE_FILL=0.62` / `WIRE_COPPER_RATIO=0.85`；
+  `estimateCopperLoss` 新增 `slot_fill_engineering` / `slot_area_net_mm2` /
+  `conductor_area_enameled_mm2` / `slot_fill_caliber`；V15 `metrics.slot_fill` 新增
+  `ratio_net` / `caliber` / `area_net_mm2`。
+- **P0-4 电流口径分档**：新增 `PF_ETA_BY_POWER` 与 `queryPfEtaRef({powerKw, motorType})`；
+  原生输出新增 `eta_ref_for_current` / `pf_eta_source`（input|nameplate|typical|constant）。
+- env 开关（默认新口径）：`DSH_L0_BG_CALIBER`（actual|intent）、`DSH_L0_ENG_SLOT_FILL`（1|0）、
+  `DSH_L0_PF_ETA_BINS`（1|0）；导出 `bgCaliberOf` / `engSlotFillOn` / `pfEtaBinsOn`。
+
+### Changed
+- **P0-1（判定语义变化）**：`native.yoke_sat` 与 `feasible` 改用**实际匝口径**，与门禁 V08 一致。
+  此前主指标按意图口径、门禁按实际口径 ⇒ 同一行「表格正常但门禁爆」。实测 200kW 矩阵
+  10/10 行主指标与门禁判定完全一致。
+- **P0-3（判定语义变化）**：V15 与 `native.feasible` 改用工程槽满率配 0.70/0.78 阈值。
+  旧「裸铜净面积/外接矩形毛槽」实测 0.17~0.27，与工程阈值不可比 ⇒ 系统性漏判真实过槽满；
+  工程口径约为旧值的 2.2~2.3 倍。V15 匝数 headroom 改为按判定用的取整值定界（±1 校正）。
+- **P0-4（数值变化）**：异步机电流反推 pf/η 由恒 0.92/0.94 改为按功率分档。
+  15kW 线电流 26.4A → **30.3A**（= Y160L-4 铭牌），11kW 19.3A → 22.6A（= Y160M-4 铭牌）。
+  PMSM 不走分档表（其 pf 本就 0.90~0.95），保持 0.92/0.94。
+  ⚠ 已实证：`COPPER_LOSS_K` 是拿 RMxprt **真值**电流/匝数拟合的
+  （`scripts/calibrate_losses_v3.mjs:53`），故修正生产侧电流是向真值收敛，**k 不需重标定**。
+
+### Fixed
+- V15 匝数 headroom 边界因 `round3` 取整差 1 匝，与判据自相矛盾（turns_max 不越限但 +1 也不越限）。
+
+### Tests
+- `tests/leverage-margin.test.mjs`：V15 headroom 断言改为按判定口径取值；新增
+  「P0-3 反向守卫」（旧口径漏判的过槽满必须被工程口径抓到）；healthy 行 fixture 的
+  peak_current 40→32（原 40A 配 11 匝工程口径实为 0.804，本就过槽满，旧口径漏判）。
+  全套 25/25 通过。
+
 ## [1.3.1] - 2026-10-15 — P2：verdict 密度无关化 + 槽形族感知
 
 > **性质：输出增强 + 规则层族感知；status/issues 合格判定语义零变化。**

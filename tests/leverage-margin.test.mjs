@@ -108,10 +108,36 @@ test('validateDesign: V15 匝数 headroom 是精确逆解（turns_max 不越限�
     slotsStator: row.slots_stator, poles: row.poles, peakCurrent: row.peak_current,
     turnsPerCoil: turns, parallelCircuits: row.parallel_circuits, airGap: row.air_gap,
   })
-  assert.ok(at(hr.max_for_slot_fill).slot_fill_ratio <= SLOT_FILL_MAX,
-    `turns_max=${hr.max_for_slot_fill} 处槽满率不得越限`)
-  assert.ok(at(hr.max_for_slot_fill + 1).slot_fill_ratio > SLOT_FILL_MAX,
+  // P0-3 后 V15 判定改用工程口径槽满率（含漆膜导线/槽有效面积），headroom 反解随之同口径。
+  // 断言必须取**与判定同一个口径**的值，否则等于拿 A 口径的阈值去校验 B 口径的逆解。
+  const fillOf = (cu) => (process.env.DSH_L0_ENG_SLOT_FILL === '0'
+    ? cu.slot_fill_ratio
+    : (cu.slot_fill_engineering ?? cu.slot_fill_ratio))
+  assert.ok(fillOf(at(hr.max_for_slot_fill)) <= SLOT_FILL_MAX,
+    `turns_max=${hr.max_for_slot_fill} 处槽满率不得越限（判定口径）`)
+  assert.ok(fillOf(at(hr.max_for_slot_fill + 1)) > SLOT_FILL_MAX,
     `turns_max+1=${hr.max_for_slot_fill + 1} 处槽满率应越限（证明是精确边界）`)
+})
+
+test('P0-3 反向守卫：旧「裸铜净/毛槽」口径漏判的过槽满，工程口径必须抓到', () => {
+  // 反向验证：改回旧口径（env=0）时该行应判通过；开启工程口径后必须判 failed。
+  // 证明 V15 的判定确实随口径切换而变，而不是「新字段加了但没人用」。
+  const row = {
+    stator_od: 260, stator_id: 160, rotor_od: 159.2, shaft_dia: 48,
+    core_length: 130, air_gap: 0.4, tooth_width: 7.1, yoke_thickness: 32,
+    poles: 4, speed: 1460, slots_stator: 36, slots_rotor: 28,
+    parallel_circuits: 1, turns_per_coil: 11, peak_current: 40, voltage: 380,
+    power_kw: 15, cooling: 'forced_air', motor_type: 'induction',
+  }
+  const cu = estimateCopperLoss({
+    statorOd: row.stator_od, statorId: row.stator_id, coreLength: row.core_length,
+    slotsStator: row.slots_stator, poles: row.poles, peakCurrent: row.peak_current,
+    turnsPerCoil: row.turns_per_coil, parallelCircuits: row.parallel_circuits, airGap: row.air_gap,
+  })
+  assert.ok(cu.slot_fill_ratio < 0.5,
+    `旧口径下该行槽满率应偏低（漏判区），实际 ${cu.slot_fill_ratio}`)
+  assert.ok(cu.slot_fill_engineering > SLOT_FILL_MAX,
+    `工程口径下该行应越限（真实过槽满），实际 ${cu.slot_fill_engineering}`)
 })
 
 test('validateDesign: V12 温升打代理标记 + back_emf 带可取整域', () => {
@@ -153,11 +179,16 @@ test('validateDesign: V14 抓「匝数填错」且指标为数值型（防 snake
 
 test('validateDesign: 通过态不误伤（margin 只加在 issue 上，不改变 status 语义）', () => {
   // 一组 healthy 异步机参数：不得因新增字段被判 failed
+  // ⚠ P0-3 订正：原 fixture 用 peak_current=40（iRms 28.3A）配 11 匝，
+  //   旧「裸铜净/毛槽」口径下仅 0.36（看似健康），工程口径实为 0.804 > SLOT_FILL_MAX
+  //   ⇒ 该行**本来就是过槽满**，旧口径漏判。为保住本用例「healthy 行不被误伤」的原意，
+  //   把电流降到 32A 峰值（iRms 22.6A，工程口径 0.643 < 0.70）：这才是一台真健康的行。
+  //   被剔除的过槽满形态由上一用例（反向守卫）显式覆盖，不丢失证据。
   const row = {
     stator_od: 260, stator_id: 160, rotor_od: 159.2, shaft_dia: 48,
     core_length: 130, air_gap: 0.4, tooth_width: 7.1, yoke_thickness: 32,
     poles: 4, speed: 1460, slots_stator: 36, slots_rotor: 28,
-    parallel_circuits: 1, turns_per_coil: 11, peak_current: 40, voltage: 380,
+    parallel_circuits: 1, turns_per_coil: 11, peak_current: 32, voltage: 380,
     power_kw: 15, cooling: 'forced_air', motor_type: 'induction',
   }
   const r = validateDesign(row)
