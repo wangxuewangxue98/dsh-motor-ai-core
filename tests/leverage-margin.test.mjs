@@ -205,13 +205,16 @@ test('validateDesign: V12 温升打代理标记 + back_emf 带可取整域', () 
 })
 
 test('validateDesign: V14 抓「匝数填错」且指标为数值型（防 snake/camel 错配静默 NaN）', () => {
-  // turns_per_coil=24 vs 理想 ~10.6 ⇒ 偏离 >2× ⇒ V14 failed
+  // turns_per_coil=36 vs 理想 ~13.8 ⇒ 偏离 2.6× ⇒ V14 failed
   // （本用例是 solveTurnsPerCoil 重构的回归守卫：错配曾使 V14 整段静默跳过）
+  // ⚠ P2-C 订正（2026-10-25）：异步机 Bg 分档标定后（4 极 0.80→0.621T），理想匝数
+  //   10.6→13.79，原错值 24 的偏离降至 1.75×（<2× 阈值）⇒ V14 不再触发。错值同步
+  //   上调至 36（偏离 2.61×），保住「>2× 必须 failed」的用例原意。
   const row = {
     stator_od: 260, stator_id: 160, rotor_od: 159.2, shaft_dia: 48,
     core_length: 130, air_gap: 0.4, tooth_width: 7.1, yoke_thickness: 22,
     poles: 4, speed: 1460, slots_stator: 36, slots_rotor: 28,
-    parallel_circuits: 1, turns_per_coil: 24, peak_current: 40, voltage: 380,
+    parallel_circuits: 1, turns_per_coil: 36, peak_current: 40, voltage: 380,
     power_kw: 15, cooling: 'forced_air', motor_type: 'induction',
   }
   const r = validateDesign(row)

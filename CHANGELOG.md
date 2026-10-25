@@ -2,6 +2,54 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.5.2] - 2026-10-25 — 选项 C：异步机气隙磁密 Bg 按极数真值分档标定
+
+> **性质：默认行为变更（需知情）。** 异步机（induction）设计意图 Bg 由恒定钢印 0.80T
+> 改为按极数分档真值（2P=0.624 / 4P=0.621 / 6P=0.575 / 8P=0.557T），
+> **全部异步机估计系统性下移 ~12%~30%**（理想匝数 +29%~44%、温升 +8~14K）。
+> 一键回滚：`DSH_L0_BG_BINS=0` 或 `opts.bgBins=false`（零回归锚点已入 l0 门禁 ⑱）。
+> pmsm 分档（2P=0.659 / 4P=0.724）与缺档极数回退 0.80 的行为不变。
+
+### Added
+- `AIR_GAP_FLUX_BY_POLES.induction` 分档表（此前为 null）：Y 系列清洁子集各极数中位。
+  数据链：65 台 RMxprt 真值集 → 剔除 46 台退化解（出力 <70% 额定，合成绕组过匝
+  ⇒ Bg 被压至 0.30~0.34T，是失败设计点非设计目标）与跨机型污染行 → 清洁子集 n=37
+  （2/4/6/8 极各 17/5/10/5 台）→ 各极 `air_gap_flux_density` 中位。
+- `bg_bins_caliber` 第三态 `explicit_override`：显式 `opts.airGapFlux` 优先于分档表，
+  此前被误报为 `default_constant`（Traceability 缺口，非计算错误）。
+
+### Changed
+- 异步机 `airGapFluxForDesign` 命中 induction 分档（开关 `bgBinsOn` 默认 ON，
+  env `DSH_L0_BG_BINS` / opts `bgBins` 可回退）。缺档极数（10/12 等）仍回退
+  `AIR_GAP_FLUX_DEFAULT=0.80`，不外推。
+- 意图口径 `air_gap_flux_density`/`tooth_flux_density` 与铁损 B_eff 口径随之
+  按 B² 缩放铁耗（与 v3 铁损标定同口径，标定红线未动）；实际口径
+  `*_flux_density_actual` 继续消费 winding-lock 校正（P2-A 不变）。
+
+### Fixed
+- `tests/leverage-margin.test.mjs` V14 fixture 订正：`turns_per_coil` 24→36。
+  新分档下理想匝 10.6→13.79，原 24 的偏离降至 1.75×（<2× 阈值）不再触发 V14
+  ⇒ 改为 36（偏离 2.61×，margin −40.7%），保持"匝数填错"检出能力。
+
+### 数据诚信与边界（诚实披露）
+- **污染证伪**：designs.db 标称 induction 的 4 极行 28/37 实为转子 44 槽 PMSM 签名
+  （中位 0.708T 与 pmsm 表 0.724T 吻合即证），已剔除；真异步签名仅 9 行且为 660V
+  工程设计（0.702T，电压等级不同）未并入。
+- **清洁判据**：真值机输出功率 ≥70% 额定；退化解出力仅 6%~33%。
+- **泛化边界**：6/8 极样本为 EMF 合成绕组（非真实冲片绕组），泛化需真实绕组复核
+  （同 `KW_EFF_DEFAULT` 告诫）；2/4 极有真实冲片绕组佐证。
+- **下游相互作用**：Bt 与 MD-SDE 门槛的联合影响未在本版量化，寻优链路升级时须复核。
+
+### Tests
+- core `scripts/verify_bg_bins_truth.mjs` 18/18（异步机条目改为"已启用分档"记录态）。
+- core `tests/` 26/26。
+- l0 `scripts/verify_bg_bins_calib.mjs`（C 主门禁，22 项：清洁子集中位同口径重算自证、
+  MAPE 7.5% 优于钢印 2×、逐台消费命中、缺档回退、三态口径、env/opts 双通道、
+  pmsm 零回归、零回归锚点）22/22。
+- l0 `scripts/verify.mjs` 135/135（V17 电压缩放改实测比例校正、V08 构造 Bg 动态化、
+  P0-3 异步机断言改独立标定态并补全 opts 通道实体断言——原返回串声称"双通道"
+  但体内只有 env 断言，属虚假声明）。
+
 ## [1.5.1] - 2026-10-25 — peer 范围放宽（修复与 l0 并装的 ERESOLVE）
 
 > **性质：纯元数据修复，代码零变化。** core 对 `@deepseek-ai/dsh` 零 import
