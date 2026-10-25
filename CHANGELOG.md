@@ -2,6 +2,33 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.5.0] - 2026-10-25 — P2-A 绕组锁定（winding-lock）：电气闭环尊重入参绕组 + E 平衡闭合
+
+> **性质：新功能，默认 OFF 零回归。** 修复 `deriveElectricalClosure` 静默覆盖入参绕组
+> （实测入参 turns_per_coil 6/24/144 输出逐位相同 ⇒ 入参从未被消费）。
+
+### Added
+- **winding-lock**（env `DSH_L0_WINDING_LOCK` / opts `windingLock`，默认 OFF）：lock ON 且传入
+  `conductors_per_slot`（优先）或 `turns_per_coil` 时，`N = (Qs/3)·(cps/2)/a`（与 RMxprt 求解器
+  口径一致）；E 平衡闭合 `Φ = Uph/(4.44·f·N·kw_eff)`，`Bg_locked = Φ/极距面积`；
+  `bgForFlux = bg_locked ?? bg_actual ?? intent`（意图口径 By 与铁损 bEffIron 不动）。
+- 新增导出 `windingLockOn` / `kwEffOf` / `KW_EFF_DEFAULT`（= 0.697，65 台 RMxprt 真值反算
+  mean、CV 5.1%；与 `WINDING_FACTOR=0.95` 的差额为斜槽削弱）。kw_eff 通道优先级
+  `opts.kwEff > env DSH_L0_KW_EFF > 0.697`。
+- `deriveElectricalClosure` 回显 `winding_lock` / `n_phase_locked` / `turns_per_coil_locked`；
+  `quickL0Estimate` 原生输出新增 `winding_lock` / `bg_locked_t` / `kw_eff_used` /
+  `air_gap_flux_density_effective`（已登记 `L0_NATIVE_FIELDS`，防被白名单过滤）。
+
+### Fixed
+- `design-rules.validateDesign` 的 `airGapFlux` 改走 `airGapFluxForDesign` 分档口径
+  （与 formula-engine 主指标同源；显式 `opts.airGapFlux` 仍优先）。
+- `tests/leverage-margin.test.mjs` 按 P1-5 铜耗机型隔离后的正确行为订正
+  （异步 k 0.263→1.333 ⇒ 15kW 行温升超线确为真实告警，改用 11kW 健康形态）。
+
+### Tests
+- 全套 26/26 通过。65 台真值验收：lock OFF→ON，Bg MAPE 77.5%→4.7%、pearson 0.030→0.988；
+  Bt pearson −0.027→0.961（验收脚本在 l0 仓 `dev-calib/accept_winding_lock.mjs`）。
+
 ## [1.4.0] - 2026-10-17 — P0 四项：磁密口径统一 / V08 严重档 / 工程槽满率 / 电流 pf-η 分档
 
 > **性质：判定口径修正（会改变可行性与效率/温升数值）。** 依据《L0 插件程序深度分析与改进方案 v2》
