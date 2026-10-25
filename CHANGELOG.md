@@ -2,6 +2,18 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.5.1] - 2026-10-25 — peer 范围放宽（修复与 l0 并装的 ERESOLVE）
+
+> **性质：纯元数据修复，代码零变化。** core 对 `@deepseek-ai/dsh` 零 import
+> （lib/ index.mjs tests/ 全仓 grep 无命中），peer 声明纯名义。
+
+### Fixed
+- `peerDependencies.@deepseek-ai/dsh` 由 `>=0.1.2 <0.2.0` 放宽为 `>=0.1.2 <0.3.0`
+  （与 l0 `dsh-motor-ai-l0` 的 peer 范围对齐）。此前 l0（peer `<0.3.0`）与 core
+  （peer `<0.2.0`）并装时，npm 7+ 自动 peer 安装报 ERESOLVE 无法解析依赖树
+  （tarball 功能自检实证：0.6.5/0.6.6 裸 `npm install` 均失败；DSH 受支持路径
+  `dsh plugin add` 走 pnpm profile 不受影响，属存量缺陷，非 1.5.0 回归）。
+
 ## [1.5.0] - 2026-10-25 — P2-A 绕组锁定（winding-lock）：电气闭环尊重入参绕组 + E 平衡闭合
 
 > **性质：新功能，默认 OFF 零回归。** 修复 `deriveElectricalClosure` 静默覆盖入参绕组
