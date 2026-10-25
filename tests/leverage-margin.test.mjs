@@ -232,12 +232,18 @@ test('validateDesign: 通过态不误伤（margin 只加在 issue 上，不改�
   //   ⇒ 该行**本来就是过槽满**，旧口径漏判。为保住本用例「healthy 行不被误伤」的原意，
   //   把电流降到 32A 峰值（iRms 22.6A，工程口径 0.643 < 0.70）：这才是一台真健康的行。
   //   被剔除的过槽满形态由上一用例（反向守卫）显式覆盖，不丢失证据。
+  // ⚠ P1-5 订正（2026-10-19）：铜耗标定系数按机型隔离后（异步机 k 0.263→1.333，
+  //   修正了"真值含转子铜耗而模型只算定子"的口径差），本行总损耗 852→1974W、
+  //   温升 88.5K 超过 F 级预警线 84K ⇒ V12 真实告警。**这是口径修对后的正确行为**，
+  //   不是误伤。为保住"healthy 行不被误伤"的用例原意，把额定功率降到 11kW
+  //   （几何与电流完全不变，故槽满率/长径比等其余门禁不受影响）：此时温升 66.8K，
+  //   确为真健康行。15kW 形态在修正后的损耗模型下本就热不合格。
   const row = {
     stator_od: 260, stator_id: 160, rotor_od: 159.2, shaft_dia: 48,
     core_length: 130, air_gap: 0.4, tooth_width: 7.1, yoke_thickness: 32,
     poles: 4, speed: 1460, slots_stator: 36, slots_rotor: 28,
     parallel_circuits: 1, turns_per_coil: 11, peak_current: 32, voltage: 380,
-    power_kw: 15, cooling: 'forced_air', motor_type: 'induction',
+    power_kw: 11, cooling: 'forced_air', motor_type: 'induction',
   }
   const r = validateDesign(row)
   assert.equal(r.status, 'passed', `healthy 行应通过，实得 ${r.status}: ${JSON.stringify(r.issues)}`)
