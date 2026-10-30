@@ -64,6 +64,11 @@ export {
   WIRE_COPPER_RATIO,
   FLUX_TARGET,
   STACKING_FACTOR,
+  // P0-8（2026-10-31）：磁密口径统一 + 匝数反标
+  TOOTH_PEAK_OVER_MEAN,
+  B_TOOTH_SAT_T,
+  BACKEMF_DROP_DEFAULT,
+  BACKEMF_DROP_RMXPRT_REF,
   AIR_GAP_FLUX_DEFAULT,
   // P0-3（2026-10-19）：按机型+极数分档的设计意图气隙磁密（仅 PMSM 有真值标定）
   AIR_GAP_FLUX_BY_POLES,
@@ -152,6 +157,8 @@ export {
   windingLockOn,
   kwEffOf,
   slotTwOn,
+  toothPeakGateOn,
+  backEmfDropOf,
   KW_EFF_DEFAULT,
   estimateMechanicalLoss,
   estimateMechStrayLoss,

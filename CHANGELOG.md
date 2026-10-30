@@ -2,6 +2,55 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.5.4] - 2026-10-31 — P0-8 磁密口径统一（齿部峰值）+ 匝数反标（反电动势压降 k_E）
+
+> **根因①（口径并存，300kW 方案 L1 实跑实证）**：齿磁密公式
+> `Bt = 2·Bg·Dsi/(Qs·tw·k_stack)` 的分子是每极磁通 `Φ = B_av·A_pole = (2/π)·B_peak·A_pole`
+> ⇒ 算出的是**极内平均**磁密；而硅钢饱和限、RMxprt/FEA 报告、以及本仓 V08 的
+> `B_YOKE_SAT_T=1.9T` 都是**极中心齿峰值** ⇒ 差 π/2≈1.5708 倍。
+> 同一套规则里 V07 目标 1.02T（平均口径）与 V08 饱和限 1.9T（峰值口径）**并存两套口径**，
+> 后果是窄齿方案实际深度饱和却显示"达标"：300kW 方案平均 1.61T「达标」
+> ⇒ 峰值 **2.53T，超硅钢饱和限 33%**。
+>
+> **根因②（匝数系统性偏多）**：`turnsIdeal` 按 `E=Uph` 反解，忽略定子漏抗+电阻压降。
+> RMxprt 实测（300kW/690V/6P，两设计点）：`k_E=E/Uph` = 0.883(I=247A) / 0.857(I=392A)
+> ⇒ 匝数偏多约 1/k_E，满载磁通低于设计意图。
+
+### Added（磁密口径）
+- 输出行新增：`tooth_flux_density_peak`（**峰值口径** = 平均 × π/2，与 RMxprt/FEA 报告同源）、
+  `tooth_flux_density_intent_peak`、`yoke_flux_density_peak`（= `yoke_flux_density_actual`，
+  轭式本身即峰值口径，**不可**再乘 π/2）、`flux_density_caliber`、`tooth_peak_sat`。
+- V07 新增**齿部峰值饱和告警**（> `B_TOOTH_SAT_T`=1.9T，与 V08 同口径）：
+  既有「对 FLUX_TARGET.tooth=1.02T 平均目标的偏离判定」**原样保留不动**（零回归）。
+- 开关 `opts.toothPeakGate` / env `DSH_L0_TOOTH_PEAK_GATE`（**默认 ON**，置 0 静默）。
+- 新增常量 `TOOTH_PEAK_OVER_MEAN = π/2`、`B_TOOTH_SAT_T = 1.9`。
+
+### Added（匝数反标）
+- 输出行新增：`back_emf_drop_factor`、`back_emf_drop_ref`（RMxprt 实测参考 0.88，仅回显）、
+  `turns_per_coil_ideal`（原值）、`turns_per_coil_ideal_at_load`（= ideal × k_E）。
+- `validateDesign` 的 `metrics.back_emf` 同步新增 `back_emf_drop_factor` / `turns_ideal_at_load`；
+  k_E<1 且行内匝数偏离反标值超 `BACKEMF_TOL` 时挂 V17 提示。
+- 开关 `opts.backEmfDrop` / env `DSH_L0_BACKEMF_DROP`（**默认 1.0 = 零回归**；非法值
+  （>1/≤0/NaN）一律回落 1.0，绝不静默接受）。
+
+### ⚠ 明确未建模（不得据此下"可行"结论）
+- **k_E 只回显、不改写 `turnsIdeal`**：改写会连锁 `bgActual`/V17/winding-lock，
+  需先有 ≥30 台大机真值标定，本期不做。
+- **绝对出力能力判据未建**：300kW 实证中"功率出不来"的主因是 Bg 分档值 0.575
+  低于该体积达标所需的 ~0.78T，k_E 仅解释其中约 5%。L0 无法判定"该 Bg 下能否出
+  spec 功率" ⇒ **必须由 L1（RMxprt）实跑确认**，不得以 L0 的 feasible=true 代替。
+- 本式与 RMxprt 的恒定残差 6%（比值 0.9411，6 点离散 0.86%）唯一来源为叠压系数
+  口径 0.98（本仓）vs 0.923（RMxprt）；本期不改动 `STACKING_FACTOR`（会连锁全部磁密与铁损标定）。
+
+### 门禁
+- 新增 `tests/flux-caliber.test.mjs` **11/11**：π/2 恒等式、**RMxprt 6 设计点外部真值同源**
+  （比值 0.9363~0.9444，离散<1%）、不换算则系统性低 ~40%（区分力）、V07 窄齿/宽齿区分、
+  opts+env 双通道、零回归（既有 V07 判定逐位不变）、k_E 非法值回落、只回显不改写、
+  两路（公式/门禁）同值、300kW 锚点（峰值 2.53T 超饱和限 33%）。
+- 反向破坏 `dev-calib/_break_flux_caliber.mjs` **五场景全部如期变红并恢复回绿**
+  （S1 2红 / S2 1红 / S3 3红 / S4 1红 / S5 1红）。
+- 全量回归 **46/46** 绿（既有 35 + 新增 11）。
+
 ## [1.5.3] - 2026-10-30 — P0-7 单一齿宽口径：槽几何消费 row.tooth_width（默认 OFF）
 
 > **根因（300kW 风机异步机方案实证）**：Bt 公式消费 `params.tooth_width`
