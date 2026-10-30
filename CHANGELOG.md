@@ -2,6 +2,34 @@
 
 本项目的所有重大变更都记录在此文件中。
 
+## [1.5.3] - 2026-10-30 — P0-7 单一齿宽口径：槽几何消费 row.tooth_width（默认 OFF）
+
+> **根因（300kW 风机异步机方案实证）**：Bt 公式消费 `params.tooth_width`
+> （tw_axis 反解值 4.39mm），而 `slotGeometryDerived` 无 tooth_width 入参、
+> 硬编码 `π·Di/(2Qs)`=8.77mm ⇒ 同一次估算里并存两个互斥齿宽：
+> 齿统一 8.77 ⇒ Bt=0.807T 挂；齿统一 4.39 ⇒ fill=0.330 挂 ——
+> **Bt 与 fill「双达标」只在两公式解耦时存在，是解耦 Artifact 而非工程可行**。
+
+### Added
+- 开关 `opts.slotTw` / env `DSH_L0_SLOT_TW`（**默认 OFF，零回归**）。
+  ON 时槽几何与 Bt 公式消费同一齿宽；OFF 恒为旧行为。
+- `slotGeometryDerived` 可选 `toothWidth` 入参；返回值新增
+  `tooth_width_used` / `tooth_width_source`（'explicit' | 'derived'）；
+  非法值（≤0/NaN）自动回退派生路径。
+- 输出行新增三字段：`slot_tooth_width_mm`（槽几何实际消费齿宽）、
+  `slot_area_mm2`（外接矩形毛槽面积，诊断用）、`slot_tw_caliber`
+  三态：`explicit`（row 值，与 Bt 同源）/ `derived_resolved`（row 未带，
+  传解析后派生值，与 Bt 兜底同源）/ `legacy_derived`（开关 OFF，旧行为；
+  此时若 row 带 tooth_width 即双齿宽并存）。
+
+### 门禁
+- 新增 `tests/slot-tw.test.mjs` **9/9**：开关双通道、OFF 零回归（面积逐位对旧公式）、
+  显式路径「只有该路径能区分」判据（4.39 vs 8.77 手算面积）、fill 方向、
+  env/opts 一致、无 row 齿宽兜底同源、直调透传/非法回退、
+  跨 `SLOT_FILL_MAX` 可行性翻转。
+- 反向破坏双路验证：拆调用点透传 ⇒ 3 红；拆 `slotGeometryDerived` 本体 ⇒ 5 红；
+  恢复均回绿。全量 `npm test` 35/35。
+
 ## [1.5.2] - 2026-10-25 — 选项 C：异步机气隙磁密 Bg 按极数真值分档标定
 
 > **性质：默认行为变更（需知情）。** 异步机（induction）设计意图 Bg 由恒定钢印 0.80T

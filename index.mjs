@@ -151,6 +151,7 @@ export {
   pfEtaBinsOn,
   windingLockOn,
   kwEffOf,
+  slotTwOn,
   KW_EFF_DEFAULT,
   estimateMechanicalLoss,
   estimateMechStrayLoss,
